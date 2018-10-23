@@ -7,6 +7,7 @@ import scipy.misc
 import tensorflow as tf
 import numpy as np
 import imageio
+import image_helper
 
 cwd = os.getcwd()
 IMG_PATH = cwd+"/dataset/rgb/"
@@ -66,12 +67,14 @@ for i,train_filename in enumerate(train_filenames):
             sys.stdout.flush()
         # Load the image removing alpha channel
         img = load_image(imgs_i[i])[:,:,:3]
+        img_shape = img.shape
         
-        depth = np.reshape(np.load(depths_i[i]), (480,640,1))
+        depth = np.reshape(np.load(depths_i[i]), (img_shape[0],img_shape[1],1))
 
         img_4d = np.concatenate((img, depth), axis=2)
 
         label = load_image(labels_i[i])[:,:,:3]
+        label = image_helper.convert_from_color_segmentation(label)
         # Create a feature
         feature = {'train/label': _bytes_feature(tf.compat.as_bytes(label.tostring())),
                 'train/image': _bytes_feature(tf.compat.as_bytes(img_4d.tostring()))}
@@ -82,8 +85,8 @@ for i,train_filename in enumerate(train_filenames):
         writer.write(example.SerializeToString())
 
         # save image as npy and label
-        np.save(path_i+f"rgbd/image{i}.npy", img_4d)
-        imageio.imwrite(path_i+f"label/image{i}.png", label)
+        #np.save(path_i+f"rgbd/image{i}.npy", img_4d)
+        #imageio.imwrite(path_i+f"label/image{i}.png", label)
 
         
     writer.close()

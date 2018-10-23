@@ -1,0 +1,18 @@
+{"objects_cat":
+    {"Table" : "table",
+    "Table_32":"table", 
+    "Plant_31":"plant",
+    "Plant":"plant",
+    "Couch":"couch",
+    "Couch_28":"couch",
+    "Table_30":"table",
+    "TV_29":"tv",
+    "TV":"tv"    
+    },
+    "cat_to_col":{
+        "table":{"r":0,"g":0,"b":1},
+        "plant":{"r":0,"g":1,"b":0},
+        "couch":{"r":1,"g":0,"b":0},
+        "tv":{"r":1,"g":1,"b":0}
+    }
+}

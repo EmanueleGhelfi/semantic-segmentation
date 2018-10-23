@@ -2,6 +2,7 @@ import os
 from random import shuffle
 import glob
 import sys
+import math
 
 import scipy.misc
 import tensorflow as tf
@@ -46,11 +47,13 @@ def _int64_feature(value):
 def _bytes_feature(value):
   return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-train_filenames = ['train.tfrecords','validation.tfrecords','test.tfrecords']  # address to save the TFRecords file
+train_filenames = ['train','validation','test']  # address to save the TFRecords file
 imgs = [train_img, val_img, test_img]
 depths = [train_depths, val_depths, test_depths]
 labels = [train_labels, val_labels, test_labels]
 paths = [TRAIN_PATH, VAL_PATH, TEST_PATH]
+
+NUM_IMAGE_PER_FILE = 20
 
 for i,train_filename in enumerate(train_filenames):
     # open the TFRecords file
@@ -59,22 +62,37 @@ for i,train_filename in enumerate(train_filenames):
     labels_i = labels[i]
     path_i = paths[i]
 
-    writer = tf.python_io.TFRecordWriter(train_filename)
-    for i in range(len(imgs_i)):
+    shard_idx = 0
+
+    num_shard = math.ceil(len(imgs_i)/NUM_IMAGE_PER_FILE)
+
+    for s in range(num_shard):
+
+      print("Writing to " + train_filename+str(s)+".tfrecord")
+      writer = tf.python_io.TFRecordWriter(train_filename+str(s)+".tfrecord")
+
+      for j in range(NUM_IMAGE_PER_FILE):
+
+        idx = s*NUM_IMAGE_PER_FILE+j
+
+        if idx >= len(imgs_i):
+          break
+
         # print how many images are saved every 1000 images
-        if not i % 100:
-            print('data: {}/{}'.format(i, len(imgs_i)))
+        if not j % 100:
+            print('data: {}/{}'.format(j, len(imgs_i)))
             sys.stdout.flush()
         # Load the image removing alpha channel
-        img = load_image(imgs_i[i])[:,:,:3]
+        img = load_image(imgs_i[idx])[:,:,:3]
         img_shape = img.shape
         
-        depth = np.reshape(np.load(depths_i[i]), (img_shape[0],img_shape[1],1))
+        depth = np.reshape(np.load(depths_i[idx]), (img_shape[0],img_shape[1],1))
 
         img_4d = np.concatenate((img, depth), axis=2)
 
-        label = load_image(labels_i[i])[:,:,:3]
+        label = load_image(labels_i[idx])[:,:,:3]
         label = image_helper.convert_from_color_segmentation(label)
+
         # Create a feature
         feature = {'train/label': _bytes_feature(tf.compat.as_bytes(label.tostring())),
                 'train/image': _bytes_feature(tf.compat.as_bytes(img_4d.tostring()))}

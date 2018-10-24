@@ -37,7 +37,7 @@ def __parse_function(item):
     img_label_crop = tf.random_crop(img_label, [300,300,5])
     img = img_label_crop[:,:,4]
     label = img_label_crop[:,:,4]
-    label = tf.cast(tf.reshape(label, (480, 640)), tf.uint8)
+    label = tf.cast(tf.reshape(label, (300, 300)), tf.uint8)
     return img, label
 
 

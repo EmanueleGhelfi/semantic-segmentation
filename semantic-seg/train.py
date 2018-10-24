@@ -30,7 +30,7 @@ def __parse_function(item):
     img = tf.decode_raw(parsed_features['train/image'], tf.float32)
     img = tf.reshape(img,(480,640,4))
     label = tf.decode_raw(parsed_features["train/label"], tf.uint8)
-    label = tf.clast(tf.reshape(label, (480,640,1)), tf.float32)
+    label = tf.cast(tf.reshape(label, (480,640,1)), tf.float32)
 
     # random crop
     img_label = tf.concat((img, label), axis=2)

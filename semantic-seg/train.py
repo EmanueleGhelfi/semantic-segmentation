@@ -44,10 +44,10 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--num_epochs', type=int, default=300, help='Number of epochs to train for')
+parser.add_argument('--num_epochs', type=int, default=1000, help='Number of epochs to train for')
 parser.add_argument('--epoch_start_i', type=int, default=0, help='Start counting epochs from this number')
 parser.add_argument('--checkpoint_step', type=int, default=5, help='How often to save checkpoints (epochs)')
-parser.add_argument('--validation_step', type=int, default=1, help='How often to perform validation (epochs)')
+parser.add_argument('--validation_step', type=int, default=5, help='How often to perform validation (epochs)')
 parser.add_argument('--image', type=str, default=None, help='The image you want to predict on. Only valid in "predict" mode.')
 parser.add_argument('--continue_training', type=str2bool, default=False, help='Whether to continue training from a checkpoint')
 parser.add_argument('--dataset', type=str, default="CamVid", help='Dataset you are using.')
@@ -130,16 +130,17 @@ network, init_fn = model_builder.build_model(model_name=args.model, frontend=arg
 
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=network, labels=net_output))
 
-iou, _ = tf.metrics.mean_iou(labels=net_output, predictions=network, num_classes=num_classes)
+iou, uiou = tf.metrics.mean_iou(labels=net_output, predictions=network, num_classes=num_classes)
 
-mean_per_class_accuracy, _ = tf.metrics.mean_per_class_accuracy(labels=net_output, predictions=network, num_classes=num_classes)
+mean_per_class_accuracy, uacc = tf.metrics.mean_per_class_accuracy(labels=net_output, predictions=network, num_classes=num_classes)
 
-precision, _ = tf.metrics.precision(labels=net_output, predictions=network)
+precision, uprec = tf.metrics.precision(labels=net_output, predictions=network)
 
-f1_score, _ = tf.contrib.metrics.f1_score(labels=net_output, predictions=network)
+f1_score, uf1 = tf.contrib.metrics.f1_score(labels=net_output, predictions=network)
 
 opt = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(loss, var_list=[var for var in tf.trainable_variables()])
 
+update_ops = [uiou, uprec, uf1, uacc]
 saver=tf.train.Saver(max_to_keep=1000)
 sess.run(tf.global_variables_initializer())
 
@@ -201,7 +202,7 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
 
     cnt=0
 
-    num_iters = 5
+    num_iters = 100
     st = time.time()
     epoch_st=time.time()
 
@@ -219,7 +220,7 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
         
         print("Training.....")
         # Do the training
-        img, label, _, current, iou_, mean_per_class_accuracy_, precision_, f1_ = sess.run([next_example, next_label, opt, loss,iou,mean_per_class_accuracy, precision, f1_score])
+        img, label, _, current, _ = sess.run([next_example, next_label, opt, loss, update_ops])
         
         # debug
         if i == 0:
@@ -227,31 +228,22 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
             imwrite("trial.png", img[:,:,:3])
             imwrite("label.png", helpers.colour_code_segmentation(helpers.reverse_one_hot(label[0]), label_values))
 
-
-        print("Loss: ", current)
-        print("IOU: ", iou_)
-        current_losses.append(current)
-        current_accs.append(mean_per_class_accuracy_)
-        current_iou.append(iou_)
-        current_prec.append(precision_)
-        current_f1_score.append(f1_)
-
         cnt = cnt + args.batch_size
-        if cnt % 20 == 0:
-            string_print = "Epoch = %d Count = %d Current_Loss = %.4f Time = %.2f"%(epoch,cnt,current,time.time()-st)
-            utils.LOG(string_print)
-            st = time.time()
+        current_losses.append(current)
+    
+    f1_, prec_, acc_, iou_ = sess.run([f1_score, precision, mean_per_class_accuracy, iou])
+    
+    print(f"INFO: f1: {f1_} \n prec: {prec_} \n acc: {acc_} \n iou: {iou_}")
+    if cnt % 20 == 0:
+        string_print = "Epoch = %d Count = %d Current_Loss = %.4f Time = %.2f"%(epoch,cnt,current,time.time()-st)
+        utils.LOG(string_print)
+        st = time.time()
 
-    mean_loss = np.mean(current_losses)
-    mean_acc = np.mean(current_accs)
-    mean_prec = np.mean(current_prec)
-    mean_iou = np.mean(current_iou)
-    mean_f1 = np.mean(current_f1_score)
-    avg_loss_per_epoch.append(mean_loss)
-    avg_iou_per_epoch.append(mean_iou)
-    avg_acc_per_epoch.append(mean_acc)
-    avg_prec_per_epoch.append(mean_prec)
-    avg_f1_score_per_epoch.append(mean_f1)
+    avg_loss_per_epoch.append(np.mean(current_losses))
+    avg_iou_per_epoch.append(iou_)
+    avg_acc_per_epoch.append(acc_)
+    avg_prec_per_epoch.append(prec_)
+    avg_f1_score_per_epoch.append(f1_)
 
     # Create directories if needed
     if not os.path.isdir("%s/%04d"%("checkpoints",epoch)):
@@ -280,20 +272,23 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
         # Do the validation on a small set of validation images
         sess.run(iterator.initializer, feed_dict={filenames: val_names})
 
-        val_iters = 5
+        # initialize local variables inside metrics 
+        sess.run(tf.local_variables_initializer())
+
+        val_iters = 20
         for i in range(val_iters):
-            _, current_loss, iou_, acc_, precision_, f1_ = sess.run([opt, loss, iou, mean_per_class_accuracy, precision, f1_score])
+            _, current_loss, _ = sess.run([opt, loss, update_ops])
             current_losses.append(current_loss)
-            current_iou.append(iou_)
-            current_accs.append(acc_)
-            current_prec.append(precision_)
-            current_f1_score.append(f1_)
         
-        avg_val_acc_per_epoch.append(np.mean(current_accs))
-        avg_val_f1_score_per_epoch.append(np.mean(current_f1_score))
-        avg_val_iou_per_epoch.append(np.mean(current_f1_score))
-        avg_val_prec_per_epoch.append(np.mean(current_prec))
+        f1_, prec_, acc_, iou_ = sess.run([f1_score, precision, mean_per_class_accuracy, iou])
+
+        avg_val_acc_per_epoch.append(acc_)
+        avg_val_f1_score_per_epoch.append(f1_)
+        avg_val_iou_per_epoch.append(iou_)
+        avg_val_prec_per_epoch.append(prec_)
         avg_val_loss_per_epoch.append(np.mean(current_losses))
+
+        print(f"VALIDATION: f1: {f1_} \n prec: {prec_} \n acc: {acc_} \n iou: {iou_}")
 
         # print visualization of a batch
         ims, gts, output_images = sess.run([next_example, next_label, network])
@@ -304,7 +299,7 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
             gt = helpers.reverse_one_hot(gts[j])
             out_vis_image = helpers.colour_code_segmentation(output_image, label_values)
 
-            file_name = f"img{j}.png"
+            file_name = f"img{j}"
 
             gt = helpers.colour_code_segmentation(gt, label_values)
 
@@ -312,11 +307,6 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
             cv2.imwrite("%s/%04d/%s_gt.png"%("checkpoints",epoch, file_name),cv2.cvtColor(np.uint8(gt), cv2.COLOR_RGB2BGR))
 
         target.close()
-
-        print("\nAverage validation accuracy for epoch # %04d = %f"% (epoch, np.mean(current_accs)))
-        print("Validation precision = ", np.mean(current_prec))
-        print("Validation F1 score = ", np.mean(current_f1_score))
-        print("Validation IoU score = ", np.mean(current_iou))
 
     epoch_time=time.time()-epoch_st
     remain_time=epoch_time*(args.num_epochs-1-epoch)

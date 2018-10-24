@@ -116,6 +116,6 @@ def build_mobile_unet(inputs, preset_model, num_classes):
 	#####################
 	#      Softmax      #
 	#####################
-	net = slim.softmax(slim.conv2d(net, num_classes, [1, 1], activation_fn=None, scope='logits'))
+	net = slim.softmax(slim.conv2d(net, num_classes, [1, 1], activation_fn=None, scope='_logits'))
 	#net = tf.nn.softmax(net)
 	return net

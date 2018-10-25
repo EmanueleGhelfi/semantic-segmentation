@@ -54,19 +54,29 @@ Example of obtained image with the corresponding label:
 :-------------------------:|:-------------------------:
 ![](image2_rgb.png)  |  ![](image2_label.png)
 
+The default configuration takes 5000 photos.
+
 ## Step 2: Tfrecord conversion
 
 Convert the generated dataset to tfrecord files.
 ```
 python write_dataset_to_tf.py
 ```
-This should save the training, validation and test sets inside dataset/tfrecord/. Images are saved in RGBD format. Labels are saved in color index format. For each pixel there is a unique label depending on the object. In this way once imported in tensorflow it is enough to transform the label using `tf.one_hot`.
+This should save the training, validation and test sets inside dataset/tfrecord/. Images are saved in RGBD format. Labels are saved in color index format. For each pixel there is a unique label depending on the object. In this way once imported in tensorflow it is enough to transform the label using `tf.one_hot`. The default configuration divides the dataset using 60% for training, 20% for validation and 20% for test. Each .tfrecord file contains 10 RGBD images and the corresponding labels.
 
 ## Step 3: Training
 
 Train the selected semantic segmentation network:
 ```
-python train.py
+python train.py --dataset dataset
 ```
-The training is implemented using the tf.data API.
+The training is implemented using the tf.data API. Images are loaded from the tfrecord file saved before and resized.
+The script performs evaluation of some batch of images saves the net weights and saves plots. TODO: Implement saving in tensorflow format.
+
+
+### Results
+
+The following results are obtained using MobileUNet. 
+
+![](loss_vs_epochs.png)
 

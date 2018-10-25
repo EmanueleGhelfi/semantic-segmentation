@@ -1,7 +1,7 @@
 # Semantic Segmentation
 
-This is a small project dìon semantic segmentation using a synthetic dataset obtained from Unreal Engine.
-The task is to create a synthetic dataset from Unreal Engine using the plugin [Unrealcv](https://unrealcv.org).
+This is a small project on semantic segmentation using a synthetic dataset obtained from Unreal Engine.
+The task is to create a synthetic dataset from Unreal Engine using the plugin [Unrealcv](https://unrealcv.org) and recognize objects in the image.
 The dataset is composed by RGBD (RGB + depth) images and ground truth. The environment is a simple room with some couches, two TVs, two plants and some tables.
 Once collected the dataset it is possible to detect and localize objects in images.
 This can be done using a semantic segmentation network. Semantic segmentation networks basically perform pixel-wise classification assigning for each pixel its class.

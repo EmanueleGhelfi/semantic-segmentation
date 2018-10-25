@@ -38,7 +38,7 @@ Start the environment defined in the Step 0. Configure the `generate_dataset.py`
 ```
 vget /unrealcv/status
 ```
-Check if the server is listening, the unreal port and that no client is no connected.
+Check if the server is listening, check the unreal port and that no client is connected.
 
 By default unrealcv generates a different label (color) for each object in the scene based on its id. Object detection is the task of recognizing the object class, not the object instance. The file conf.json defines the class for each object of interest in the scene, based on its id. When the script starts it configures unrealcv by setting the defined color for each object and setting all other object's color to black.
 
@@ -46,7 +46,11 @@ Launch:
 ```
 python generate_dataset.py
 ```
-This should save the rgb images, the depth images and associated labels inside the folder `dataset`.
+This should save the rgb images, the depth images and associated labels inside the folder `dataset`. The script moves randomly the camera inside a predefined range and takes photos. A check is added in order to not take empty photos.
+
+Example of obtained image with the corresponding label:
+
+
 
 ## Step 2: Tfrecord conversion
 

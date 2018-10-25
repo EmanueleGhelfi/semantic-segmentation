@@ -80,3 +80,7 @@ The following results are obtained using MobileUNet.
 
 ![](loss_vs_epochs.png)
 
+![](accuracy_vs_epochs.png)
+
+![](iou_vs_epochs.png)
+

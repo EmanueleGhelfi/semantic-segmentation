@@ -66,12 +66,24 @@ This should save the training, validation and test sets inside dataset/tfrecord/
 
 ## Step 3: Training
 
+Specify inside the file `dataset/class_dict.csv` the object classes to recognize:
+```
+name,r,g,b
+void,0,0,0
+tv,255,255,0
+couch,255,0,0
+plant,0,255,0
+table,0,0,255
+```
+
+The class void is needed since the net should output for each pixel a probability for each class.
+
 Train the selected semantic segmentation network:
 ```
-python train.py --dataset dataset
+python train.py --dataset dataset --model MobileUNet
 ```
 The training is implemented using the tf.data API. Images are loaded from the tfrecord file saved before and resized.
-The script performs evaluation of some batch of images saves the net weights and saves plots. TODO: Implement saving in tensorflow format.
+The script performs evaluation of some batch of images saves the net weights and saves plots. TODO: Implement saving in tensorflow format. 
 
 
 ### Results
@@ -83,4 +95,8 @@ The following results are obtained using MobileUNet.
 ![](accuracy_vs_epochs.png)
 
 ![](iou_vs_epochs.png)
+
+### Notebook
+
+You can also check the notebook: https://colab.research.google.com/drive/1CdDyMWF3vNAPz-BbRXSg0eK_SvAkzSgF
 

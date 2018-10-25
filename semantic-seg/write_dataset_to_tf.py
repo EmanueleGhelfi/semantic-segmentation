@@ -1,114 +1,121 @@
+import os
+from random import shuffle
+import glob
+import sys
+import math
+
+import scipy.misc
+import tensorflow as tf
 import numpy as np
-from unrealcv import *
-import json
-from commands import *
-import sys, os, io
-import time
-from image_helper import *
-conf = open("conf.json").read()
-conf = json.loads(conf)
+import imageio
+import image_helper
 
-y_min = -200
-y_max = 400
-x_min = -100
-x_max = 100
-z_min = -50
-z_max = 200
+cwd = os.getcwd()
+IMG_PATH = cwd+"/dataset/rgb/"
+DEPTH_PATH = cwd+"/dataset/depth/"
+LABEL_PATH = cwd+"/dataset/label/"
+RGBD_PATH = cwd+"/dataset/rgbd/"
+TRAIN_PATH = cwd+"/dataset/train/"
+VAL_PATH = cwd+"/dataset/validation/"
+TEST_PATH = cwd+"/dataset/test/"
 
-DATASET_SIZE = 5000
-PIXEL_THRESHOLD = 100
-DEPTH_PATH = os.getcwd()+"/dataset/depth/"
-ANNOTATION_PATH = os.getcwd()+"/dataset/label/"
-NORMAL_PATH = os.getcwd()+"/dataset/rgb/"
+# get file and sort by name
+image_list = sorted(glob.glob(IMG_PATH+"*.png"))
+depth_list = sorted(glob.glob(DEPTH_PATH+"*.npy"))
+label_list = sorted(glob.glob(LABEL_PATH+"*.png"))
 
-port = 9014
-host ='127.0.0.1'
+print(image_list[0:11], depth_list[0:11], label_list[0:11])
 
-def setup_category_color(client):
-    # get all ids from server
-    res = client.request(REQUEST_OBJECTS)
-    ids = res.split(" ")
-    for id in ids:
-        r = 0
-        g = 0
-        b = 0
+shuffle_data = True  # shuffle the addresses before saving
+    
+# Divide the hata into 60% train, 20% validation, and 20% test
+train_img = image_list[0:int(0.6*len(image_list))]
+train_labels = label_list[0:int(0.6*len(label_list))]
+train_depths = depth_list[0:int(0.6*len(depth_list))]
+val_img = image_list[int(0.6*len(image_list)):int(0.8*len(image_list))]
+val_depths = depth_list[int(0.6*len(depth_list)):int(0.8*len(depth_list))]
+val_labels = label_list[int(0.6*len(label_list)):int(0.8*len(label_list))]
+test_img = image_list[int(0.8*len(image_list)):]
+test_labels = label_list[int(0.8*len(label_list)):]
+test_depths = depth_list[int(0.8*len(depth_list)):]
 
-        # if it is an object to detect then set its color
-        if id in conf['objects_cat'].keys():
-            r = conf['cat_to_col'][conf['objects_cat'][id]]['r']*255
-            g = conf['cat_to_col'][conf['objects_cat'][id]]['g']*255
-            b = conf['cat_to_col'][conf['objects_cat'][id]]['b']*255
+def load_image(file):
+    import imageio
+    return imageio.imread(file) 
 
-        client.request(SET_OBJECT+f"{id}/color {r} {g} {b}")
+def _int64_feature(value):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+def _bytes_feature(value):
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-        # check result
-        res = client.request(f'vget /object/{id}/color')
-        print(f"Set color of object {id} to {res}")
+if not os.path.exists("dataset/tfrecord/train"):
+  os.makedirs("dataset/tfrecord/train/")
 
+if not os.path.exists("dataset/tfrecord/test"):
+  os.makedirs("dataset/tfrecord/test/")
 
-def main():
-    # connect to server
-    client = Client((host, port))
-    client.connect()
-    if not client.isconnected():
-        print('UnrealCV server is not running. Run the game downloaded from http://unrealcv.github.io first.')
-        sys.exit(-1)
-    print("Client connected")
-    time.sleep(1)
+if not os.path.exists("dataset/tfrecord/validation"):
+  os.makedirs("dataset/tfrecord/validation/")
 
-    setup_category_color(client)
+train_filenames = ['dataset/tfrecord/train/train','dataset/tfrecord/validation/validation','dataset/tfrecord/test/test']  # address to save the TFRecords file
+imgs = [train_img, val_img, test_img]
+depths = [train_depths, val_depths, test_depths]
+labels = [train_labels, val_labels, test_labels]
+paths = [TRAIN_PATH, VAL_PATH, TEST_PATH]
 
-    init_pos = client.request("vget /camera/0/location").split(" ")
-    z = init_pos[2]
-    init_rot = client.request("vget /camera/0/rotation").split(" ")
-    pitch = init_rot[0]
-    roll = init_rot[2]
-    # save image
-    for i in range(DATASET_SIZE):
-        object_found = False
-        while not object_found:
-            x = np.random.rand()*(x_max-x_min) + x_min
-            y = np.random.rand()*(y_max-y_min) + y_min
-            yaw = np.random.rand()*359
-            print(f"camera position {x},{y},{z},{roll},{pitch},{yaw}")
-            # change camera position
-            res = client.request(f"vset /camera/0/location {x} {y} {z}")
+NUM_IMAGE_PER_FILE = 10
 
-            # change camera rotation
-            res = client.request(f"vset /camera/0/rotation {pitch} {yaw} {roll}")
+for i,train_filename in enumerate(train_filenames):
+    # open the TFRecords file
+    depths_i = depths[i]
+    imgs_i = imgs[i]
+    labels_i = labels[i]
+    path_i = paths[i]
 
-            # get camera location
-            loc = client.request("vget /camera/0/location")
-            rot = client.request("vget /camera/0/rotation")
-            print("Camera location ", loc)
-            print("Camera rotation ", rot)
-            
-            obj = client.request(f'vget /camera/0/object_mask png', timeout=60)
-            obj_np = read_png(obj)
+    shard_idx = 0
 
-            # an object is found if there are at least 100 pixel different from 0
-            object_found = (obj_np[:,:,:-1] != np.reshape(np.array([0,0,0]),(1,1,3))).sum() > PIXEL_THRESHOLD
+    num_shard = math.ceil(len(imgs_i)/NUM_IMAGE_PER_FILE)
 
-            print("Object found: ", object_found)
-            if object_found:
+    for s in range(num_shard):
 
-                img = client.request(f'vget /camera/0/lit png', timeout=60)
-                depth = client.request(f'vget /camera/0/depth npy', timeout=60)
-                depth = read_npy(depth)
+      print("Writing to " + train_filename+str(s)+".tfrecord")
+      writer = tf.python_io.TFRecordWriter(train_filename+str(s)+".tfrecord")
 
-                # save to file
-                with open(NORMAL_PATH+f'image{i}.png','wb') as f:
-                    f.write(img)
+      for j in range(NUM_IMAGE_PER_FILE):
 
-                with open(ANNOTATION_PATH+f'image{i}.png','wb') as f:
-                    f.write(obj)
+        idx = s*NUM_IMAGE_PER_FILE+j
 
-                np.save(DEPTH_PATH+f'image{i}.npy', depth)         
-            
-    pass
+        if idx >= len(imgs_i):
+          break
 
+        # print how many images are saved every 1000 images
+        if not j % 100:
+            print('data: {}/{}'.format(idx, len(imgs_i)))
+            sys.stdout.flush()
+        # Load the image removing alpha channel
+        img = load_image(imgs_i[idx])[:,:,:3]
+        img_shape = img.shape
+        
+        depth = np.reshape(np.load(depths_i[idx]), (img_shape[0],img_shape[1],1))
 
+        img_4d = np.concatenate((img, depth), axis=2)
 
-if __name__=="__main__":
-    print(conf)
-    main()
+        label = load_image(labels_i[idx])[:,:,:3]
+        label = image_helper.convert_from_color_segmentation(label)
+
+        # Create a feature
+        feature = {'train/label': _bytes_feature(tf.compat.as_bytes(label.tostring())),
+                'train/image': _bytes_feature(tf.compat.as_bytes(img_4d.tostring()))}
+        # Create an example protocol buffer
+        example = tf.train.Example(features=tf.train.Features(feature=feature))
+        
+        # Serialize to string and write on the file
+        writer.write(example.SerializeToString())
+
+        # save image as npy and label
+        #np.save(path_i+f"rgbd/image{i}.npy", img_4d)
+        #imageio.imwrite(path_i+f"label/image{i}.png", label)
+
+        
+    writer.close()
+    sys.stdout.flush()

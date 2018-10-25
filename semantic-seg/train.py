@@ -34,10 +34,10 @@ def __parse_function(item):
 
     # random crop
     img_label = tf.concat((img, label), axis=2)
-    img_label_crop = tf.random_crop(img_label, [300,300,5])
+    img_label_crop = tf.random_crop(img_label, [288,288,5])
     img = img_label_crop[:,:,:4]
     label = img_label_crop[:,:,4]
-    label = tf.cast(tf.reshape(label, (300, 300)), tf.uint8)
+    label = tf.cast(tf.reshape(label, (288, 288)), tf.uint8)
     return img, label
 
 
@@ -58,8 +58,8 @@ parser.add_argument('--validation_step', type=int, default=5, help='How often to
 parser.add_argument('--image', type=str, default=None, help='The image you want to predict on. Only valid in "predict" mode.')
 parser.add_argument('--continue_training', type=str2bool, default=False, help='Whether to continue training from a checkpoint')
 parser.add_argument('--dataset', type=str, default="CamVid", help='Dataset you are using.')
-parser.add_argument('--crop_height', type=int, default=300, help='Height of cropped input image to network')
-parser.add_argument('--crop_width', type=int, default=300, help='Width of cropped input image to network')
+parser.add_argument('--crop_height', type=int, default=288, help='Height of cropped input image to network')
+parser.add_argument('--crop_width', type=int, default=288, help='Width of cropped input image to network')
 parser.add_argument('--batch_size', type=int, default=1, help='Number of images in each batch')
 parser.add_argument('--num_val_images', type=int, default=20, help='The number of images to used for validations')
 parser.add_argument('--h_flip', type=str2bool, default=False, help='Whether to randomly flip the image horizontally for data augmentation')
@@ -69,30 +69,6 @@ parser.add_argument('--rotation', type=float, default=None, help='Whether to ran
 parser.add_argument('--model', type=str, default="FC-DenseNet56", help='The model you are using. See model_builder.py for supported models')
 parser.add_argument('--frontend', type=str, default="ResNet50", help='The frontend you are using. See frontend_builder.py for supported models')
 args = parser.parse_args()
-
-
-def data_augmentation(input_image, output_image):
-    # Data augmentation
-    input_image, output_image = utils.random_crop(input_image, output_image, args.crop_height, args.crop_width)
-
-    if args.h_flip and random.randint(0,1):
-        input_image = cv2.flip(input_image, 1)
-        output_image = cv2.flip(output_image, 1)
-    if args.v_flip and random.randint(0,1):
-        input_image = cv2.flip(input_image, 0)
-        output_image = cv2.flip(output_image, 0)
-    if args.brightness:
-        factor = 1.0 + random.uniform(-1.0*args.brightness, args.brightness)
-        table = np.array([((i / 255.0) * factor) * 255 for i in np.arange(0, 256)]).astype(np.uint8)
-        input_image = cv2.LUT(input_image, table)
-    if args.rotation:
-        angle = random.uniform(-1*args.rotation, args.rotation)
-    if args.rotation:
-        M = cv2.getRotationMatrix2D((input_image.shape[1]//2, input_image.shape[0]//2), angle, 1.0)
-        input_image = cv2.warpAffine(input_image, M, (input_image.shape[1], input_image.shape[0]), flags=cv2.INTER_NEAREST)
-        output_image = cv2.warpAffine(output_image, M, (output_image.shape[1], output_image.shape[0]), flags=cv2.INTER_NEAREST)
-
-    return input_image, output_image
 
 
 # Get the names of the classes so we can record the evaluation results
@@ -114,16 +90,17 @@ sess=tf.Session(config=config)
 print("Loading the data ...")
 batch_size = 5
 filenames = tf.placeholder(tf.string, shape=[None])
-dataset = tf.data.TFRecordDataset(filenames)
-dataset = dataset.map(__parse_function)  # Parse the record into tensors.
-dataset = dataset.repeat()  # Repeat the input indefinitely.
-dataset = dataset.batch(batch_size)
-iterator = dataset.make_initializable_iterator()
+dataset_tf = tf.data.TFRecordDataset(filenames)
+dataset_tf = dataset_tf.map(__parse_function)  # Parse the record into tensors.
+dataset_tf = dataset_tf.repeat()  # Repeat the input indefinitely.
+dataset_tf = dataset_tf.batch(batch_size)
+iterator = dataset_tf.make_initializable_iterator()
 next_example, next_label = iterator.get_next()
+
+# transform to one hot notation since it is required for computing all quantities
 next_label = tf.one_hot(tf.cast(next_label, tf.uint8),depth=num_classes, axis=3)
 
 print(next_label.get_shape())
-#next_example, next_label = helpers.random_crop_and_pad_image_and_labels(image=next_example, labels=next_label, size=[args.crop_height, args.crop_width])
 
 train_names = glob.glob(os.getcwd()+"/dataset/tfrecord/train/*.tfrecord")
 test_names = glob.glob(os.getcwd()+"/dataset/tfrecord/test/*.tfrecord")
@@ -329,7 +306,9 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
 
         fig1, ax1 = plt.subplots(figsize=(11, 8))
 
-        ax1.plot(range(epoch+1), avg_val_acc_per_epoch)
+        val_x = np.arange(len(avg_val_acc_per_epoch))*args.validation_step
+
+        ax1.plot(val_x, avg_val_acc_per_epoch)
         ax1.set_title("Average validation accuracy vs epochs")
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Avg. val. accuracy")
@@ -341,7 +320,7 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
 
         fig2, ax2 = plt.subplots(figsize=(11, 8))
 
-        ax2.plot(range(epoch+1), avg_val_loss_per_epoch)
+        ax2.plot(val_x, avg_val_loss_per_epoch)
         ax2.set_title("Average loss vs epochs")
         ax2.set_xlabel("Epoch")
         ax2.set_ylabel("Current loss")
@@ -352,7 +331,7 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
 
         fig3, ax3 = plt.subplots(figsize=(11, 8))
 
-        ax3.plot(range(epoch+1), avg_val_iou_per_epoch)
+        ax3.plot(val_x, avg_val_iou_per_epoch)
         ax3.set_title("Average val IoU vs epochs")
         ax3.set_xlabel("Epoch")
         ax3.set_ylabel("Current IoU")

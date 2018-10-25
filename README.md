@@ -30,6 +30,8 @@ pip install -r requirements.txt
 Download the Unreal enviroment from [here](https://drive.google.com/open?id=1stYziULUXthkDaK0Bi0A6474u_hc_Lip).
 Open the project with unreal.
 
+![](images/home.gif)
+
 ### Using a new environment
 install the plugin [Unrealcv](https://unrealcv.org) following the instructions. Start a new project and import the desired objects.
 
@@ -52,7 +54,7 @@ Example of obtained image with the corresponding label:
 
 | Image             |  Label |
 :-------------------------:|:-------------------------:
-![](image2_rgb.png)  |  ![](image2_label.png)
+![](images/image2_rgb.png)  |  ![](images/image2_label.png)
 
 The default configuration takes 5000 photos.
 
@@ -95,6 +97,21 @@ The following results are obtained using MobileUNet.
 ![](accuracy_vs_epochs.png)
 
 ![](iou_vs_epochs.png)
+
+Epoch 1:
+
+| Network Output             |  Ground Truth |
+:-------------------------:|:-------------------------:
+![](images/image3_pred_it0.png)  |  ![](images/image3_gt_it0.png)
+![](images/image10_pred_it0.png)  |  ![](images/image10_gt_it0.png)
+
+Epoch 70:
+
+| Network Output             |  Ground Truth |
+:-------------------------:|:-------------------------:
+![](images/image3_pred.png)  |  ![](images/image3_gt.png)
+![](images/image10_pred.png)  |  ![](images/image10_gt.png)
+
 
 ### Notebook
 

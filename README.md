@@ -106,6 +106,7 @@ Epoch 1:
 ![](images/image10_pred_it0.png)  |  ![](images/image10_gt_it0.png)
 
 Epoch 70:
+
 | Network Output             |  Ground Truth |
 :-------------------------:|:-------------------------:
 ![](images/image3_pred.png)  |  ![](images/image3_gt.png)

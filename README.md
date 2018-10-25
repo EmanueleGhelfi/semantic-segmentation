@@ -49,6 +49,7 @@ python generate_dataset.py
 This should save the rgb images, the depth images and associated labels inside the folder `dataset`. The script moves randomly the camera inside a predefined range and takes photos. A check is added in order to not take empty photos.
 
 Example of obtained image with the corresponding label:
+
 | Image             |  Label |
 :-------------------------:|:-------------------------:
 ![](image2_rgb.png)  |  ![](image2_label.png)

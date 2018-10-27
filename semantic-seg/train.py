@@ -112,17 +112,19 @@ net_output = next_label
 
 network, init_fn = model_builder.build_model(model_name=args.model, frontend=args.frontend, net_input=net_input, num_classes=num_classes, crop_width=args.crop_width, crop_height=args.crop_height, is_training=True)
 
+im_argmax = tf.argmax(network, axis=3)
+
+one_hot_img = tf.one_hot(im_argmax, depth=num_classes, axis=3)
+
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=network, labels=net_output))
 
-probs = slim.softmax(network) 
+iou, uiou = tf.metrics.mean_iou(labels=net_output, predictions=one_hot_img, num_classes=num_classes)
 
-iou, uiou = tf.metrics.mean_iou(labels=net_output, predictions=probs, num_classes=num_classes)
+mean_per_class_accuracy, uacc = tf.metrics.mean_per_class_accuracy(labels=net_output, predictions=one_hot_img, num_classes=num_classes)
 
-mean_per_class_accuracy, uacc = tf.metrics.mean_per_class_accuracy(labels=net_output, predictions=probs, num_classes=num_classes)
+precision, uprec = tf.metrics.precision(labels=net_output, predictions=one_hot_img)
 
-precision, uprec = tf.metrics.precision(labels=net_output, predictions=probs)
-
-f1_score, uf1 = tf.contrib.metrics.f1_score(labels=net_output, predictions=probs)
+f1_score, uf1 = tf.contrib.metrics.f1_score(labels=net_output, predictions=one_hot_img)
 
 opt = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(loss, var_list=[var for var in tf.trainable_variables()])
 

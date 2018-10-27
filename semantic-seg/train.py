@@ -114,13 +114,15 @@ network, init_fn = model_builder.build_model(model_name=args.model, frontend=arg
 
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=network, labels=net_output))
 
-iou, uiou = tf.metrics.mean_iou(labels=net_output, predictions=network, num_classes=num_classes)
+probs = slim.softmax(network) 
 
-mean_per_class_accuracy, uacc = tf.metrics.mean_per_class_accuracy(labels=net_output, predictions=network, num_classes=num_classes)
+iou, uiou = tf.metrics.mean_iou(labels=net_output, predictions=probs, num_classes=num_classes)
 
-precision, uprec = tf.metrics.precision(labels=net_output, predictions=network)
+mean_per_class_accuracy, uacc = tf.metrics.mean_per_class_accuracy(labels=net_output, predictions=probs, num_classes=num_classes)
 
-f1_score, uf1 = tf.contrib.metrics.f1_score(labels=net_output, predictions=network)
+precision, uprec = tf.metrics.precision(labels=net_output, predictions=probs)
+
+f1_score, uf1 = tf.contrib.metrics.f1_score(labels=net_output, predictions=probs)
 
 opt = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(loss, var_list=[var for var in tf.trainable_variables()])
 

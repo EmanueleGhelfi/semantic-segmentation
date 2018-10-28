@@ -91,14 +91,18 @@ print("Loading the data ...")
 batch_size = 5
 filenames = tf.placeholder(tf.string, shape=[None])
 dataset_tf = tf.data.TFRecordDataset(filenames)
+# shuffle before heavy transformations
+dataset_tf = dataset_tf.shuffle(buffer_size=1000)
 dataset_tf = dataset_tf.map(__parse_function)  # Parse the record into tensors.
 dataset_tf = dataset_tf.repeat()  # Repeat the input indefinitely.
 dataset_tf = dataset_tf.batch(batch_size)
+dataset_tf = dataset_tf.prefetch(3)
 iterator = dataset_tf.make_initializable_iterator()
 next_example, next_label = iterator.get_next()
 
 # transform to one hot notation since it is required for computing all quantities
 next_label = tf.one_hot(tf.cast(next_label, tf.uint8),depth=num_classes, axis=3)
+next_label_rev_one_hot = tf.cast(next_label, tf.uint8)
 
 print(next_label.get_shape())
 
@@ -118,9 +122,9 @@ one_hot_img = tf.one_hot(im_argmax, depth=num_classes, axis=3)
 
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=network, labels=net_output))
 
-iou, uiou = tf.metrics.mean_iou(labels=net_output, predictions=one_hot_img, num_classes=num_classes)
+iou, uiou = tf.metrics.mean_iou(labels=next_label_rev_one_hot, predictions=im_argmax, num_classes=num_classes)
 
-mean_per_class_accuracy, uacc = tf.metrics.mean_per_class_accuracy(labels=net_output, predictions=one_hot_img, num_classes=num_classes)
+mean_per_class_accuracy, uacc = tf.metrics.mean_per_class_accuracy(labels=next_label_rev_one_hot, predictions=im_argmax, num_classes=num_classes)
 
 precision, uprec = tf.metrics.precision(labels=net_output, predictions=one_hot_img)
 
@@ -211,21 +215,19 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
         img, label, _, current, _ = sess.run([next_example, next_label, opt, loss, update_ops])
         
         # debug
-        if i == 0:
+        if epoch == 0 and i==0:
             img = img[0]
             imwrite("trial.png", img[:,:,:3])
             imwrite("label.png", helpers.colour_code_segmentation(helpers.reverse_one_hot(label[0]), label_values))
 
-        cnt = cnt + args.batch_size
         current_losses.append(current)
     
     f1_, prec_, acc_, iou_ = sess.run([f1_score, precision, mean_per_class_accuracy, iou])
     
     print(f"INFO: f1: {f1_} \n prec: {prec_} \n acc: {acc_} \n iou: {iou_}")
-    if cnt % 20 == 0:
-        string_print = "Epoch = %d Count = %d Current_Loss = %.4f Time = %.2f"%(epoch,cnt,current,time.time()-st)
-        utils.LOG(string_print)
-        st = time.time()
+    string_print = "Epoch = %d Count = %d Current_Loss = %.4f Time = %.2f"%(epoch,cnt,current,time.time()-st)
+    utils.LOG(string_print)
+    st = time.time()
 
     avg_loss_per_epoch.append(np.mean(current_losses))
     avg_iou_per_epoch.append(iou_)
@@ -265,7 +267,7 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
 
         val_iters = 20
         for i in range(val_iters):
-            _, current_loss, _ = sess.run([opt, loss, update_ops])
+            current_loss, _ = sess.run([loss, update_ops])
             current_losses.append(current_loss)
         
         f1_, prec_, acc_, iou_ = sess.run([f1_score, precision, mean_per_class_accuracy, iou])
@@ -282,6 +284,8 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
         ims, gts, output_images = sess.run([next_example, next_label, network])
 
         for j in range(ims.shape[0]):
+            input_img = ims[0,:,:,:3]
+
             output_image = np.array(output_images[j])
             output_image = helpers.reverse_one_hot(output_image)
             gt = helpers.reverse_one_hot(gts[j])
@@ -291,6 +295,7 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
 
             gt = helpers.colour_code_segmentation(gt, label_values)
 
+            cv2.imwrite("%s/%04d/%s.png"%("checkpoints",epoch, file_name),cv2.cvtColor(np.uint8(input_img), cv2.COLOR_RGB2BGR))
             cv2.imwrite("%s/%04d/%s_pred.png"%("checkpoints",epoch, file_name),cv2.cvtColor(np.uint8(out_vis_image), cv2.COLOR_RGB2BGR))
             cv2.imwrite("%s/%04d/%s_gt.png"%("checkpoints",epoch, file_name),cv2.cvtColor(np.uint8(gt), cv2.COLOR_RGB2BGR))
 
@@ -376,6 +381,8 @@ for epoch in range(args.epoch_start_i, args.num_epochs):
         plt.savefig('Tra_loss_vs_epochs.png')
 
         plt.clf()
+        plt.close('all')
+
 
 
 

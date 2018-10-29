@@ -120,6 +120,8 @@ Epoch 70:
 
 Coming soon: test results and other models...
 
+Check the folder: https://drive.google.com/open?id=15tp9lZVJVC44LCzfjv22Y1kfXqk4iSKu to see some results.
+
 ### Notebook
 
 You can also check the notebook: https://colab.research.google.com/drive/1CdDyMWF3vNAPz-BbRXSg0eK_SvAkzSgF

@@ -87,6 +87,12 @@ python train.py --dataset dataset --model MobileUNet
 The training is implemented using the tf.data API. Images are loaded from the tfrecord file saved before and resized.
 The script performs evaluation of some batch of images saves the net weights and saves plots. TODO: Implement saving in tensorflow format. 
 
+## Step 4: Test
+Test the network on the test set:
+```
+python test.py --dataset dataset --model MobileUNet --checkpoint_path checkpoint_path
+```
+
 
 ### Results
 
@@ -112,6 +118,7 @@ Epoch 70:
 ![](images/image3_pred.png)  |  ![](images/image3_gt.png)
 ![](images/image10_pred.png)  |  ![](images/image10_gt.png)
 
+Coming soon: test results and other models...
 
 ### Notebook
 

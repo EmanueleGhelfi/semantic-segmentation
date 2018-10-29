@@ -101,8 +101,8 @@ iterator = dataset_tf.make_initializable_iterator()
 next_example, next_label = iterator.get_next()
 
 # transform to one hot notation since it is required for computing all quantities
-next_label = tf.one_hot(tf.cast(next_label, tf.uint8),depth=num_classes, axis=3)
 next_label_rev_one_hot = tf.cast(next_label, tf.uint8)
+next_label = tf.one_hot(tf.cast(next_label, tf.uint8),depth=num_classes, axis=3)
 
 print(next_label.get_shape())
 

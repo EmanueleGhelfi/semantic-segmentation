@@ -121,6 +121,7 @@ Epoch 70:
 Coming soon: test results and other models...
 
 Check the folder: https://drive.google.com/open?id=15tp9lZVJVC44LCzfjv22Y1kfXqk4iSKu to see some results.
+Check {ModelName}/checkpoints/ and look inside the folders numbered with a multiple of 5 (sorry). Images named with _gt are ground truths. 
 
 ### Notebook
 
